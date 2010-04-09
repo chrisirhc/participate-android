@@ -9,6 +9,15 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
 
+
+import com.ibm.mqtt.IMqttClient;
+import com.ibm.mqtt.MqttClient;
+import com.ibm.mqtt.MqttException;
+import com.ibm.mqtt.MqttNotConnectedException;
+import com.ibm.mqtt.MqttPersistence;
+import com.ibm.mqtt.MqttPersistenceException;
+import com.ibm.mqtt.MqttSimpleCallback;
+
 public class Participate extends Activity {
     /** Called when the activity is first created. */
     @Override
