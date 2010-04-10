@@ -1,4 +1,4 @@
-package com.Participate;
+package sg.edu.nus.comp.cs3248.participate;
 
 import android.app.Service;
 import android.content.Intent;
@@ -22,7 +22,7 @@ public class Messager extends Service implements MqttSimpleCallback {
             return Messager.this;
         }
     }
-    
+
     IMqttClient mqttClient = null;
     @Override
     public void onCreate() {
@@ -46,7 +46,6 @@ public class Messager extends Service implements MqttSimpleCallback {
         }).start();
     }
     
-    /** TODO Might want to put this on another thread */
     private void connectToBroker() {
         Log.i("Connecting", "Attempt");
         try {
@@ -111,5 +110,10 @@ public class Messager extends Service implements MqttSimpleCallback {
                 connectToBroker();
             }
         }).start();
+    }
+    
+    /** Register the user on the server */
+    public void registerUser(String userId) {
+        
     }
 }

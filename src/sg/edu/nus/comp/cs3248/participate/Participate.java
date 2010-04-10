@@ -1,4 +1,4 @@
-package com.Participate;
+package sg.edu.nus.comp.cs3248.participate;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -50,7 +50,8 @@ public class Participate extends Activity {
             // service that we know is running in our own process, we can
             // cast its IBinder to a concrete class and directly access it.
             mBoundService = ((Messager.LocalBinder)service).getService();
-            
+
+            // mBoundService.registerUser();
             // Tell the user about this for our demo.
             Toast.makeText(Participate.this, "connected to Messager",
                     Toast.LENGTH_SHORT).show();
@@ -110,7 +111,9 @@ public class Participate extends Activity {
 
     @Override
     protected void onNewIntent (Intent intent) {
+        if (intent.getAction() == "com.participate") {
         textbox.setText(intent.getByteArrayExtra("topic").toString() 
                 + intent.getByteArrayExtra("payload").toString());
+        }
     }
 }
