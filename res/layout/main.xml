@@ -9,4 +9,7 @@
     android:layout_height="wrap_content" 
     android:text="@string/hello"
     android:id="@+id/textbox"/>
+<TextView android:text="Hi there" android:layout_width="wrap_content" android:layout_height="wrap_content"></TextView>
+<TextView android:text="User's name or Id here" android:layout_width="wrap_content" android:layout_height="wrap_content" android:id="@+id/userId"></TextView>
+<TextView android:text="Class Title Here" android:layout_width="wrap_content" android:layout_height="wrap_content" android:id="@+id/classTitle"></TextView>
 </LinearLayout>

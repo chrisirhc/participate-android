@@ -10,6 +10,8 @@ import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
@@ -21,6 +23,9 @@ import android.widget.Toast;
  */
 
 public class Participate extends Activity {
+    public static final String ACTION_PSESSION_STARTED = 
+        "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION_STARTED";
+    
     private TextView textbox;
     private SharedPreferences prefs;
     private SharedPreferences.Editor prefsedit;
@@ -37,7 +42,6 @@ public class Participate extends Activity {
         // put this in a thread?
         bindService(new Intent(Participate.this, 
                 Messager.class), mConnection, Context.BIND_AUTO_CREATE);
-        // mBoundService.sessionStarted();
     }
     
     private Messager mBoundService;
@@ -50,7 +54,9 @@ public class Participate extends Activity {
             // service that we know is running in our own process, we can
             // cast its IBinder to a concrete class and directly access it.
             mBoundService = ((Messager.LocalBinder)service).getService();
-
+            
+            // Attempt to register
+            mBoundService.registerUser(prefs.getString("userId", "0"));
             // mBoundService.registerUser();
             // Tell the user about this for our demo.
             Toast.makeText(Participate.this, "connected to Messager",
@@ -98,6 +104,7 @@ public class Participate extends Activity {
                                     // perform necessary stuff.
                                     prefsedit.putString("userId", input.getText().toString());
                                     prefsedit.commit();
+                                    mBoundService.registerUser(input.getText().toString());
                                 }
                             }).setNegativeButton(android.R.string.cancel,
                             new DialogInterface.OnClickListener() {
@@ -110,10 +117,33 @@ public class Participate extends Activity {
     }
 
     @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        Log.i("pressed", Integer.toString(keyCode));
+        switch(keyCode) {
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+                togglePsession();
+                return true;
+        }
+        return false;
+    }
+
+    @Override
     protected void onNewIntent (Intent intent) {
-        if (intent.getAction() == "com.participate") {
+        if (intent.getAction() == Participate.ACTION_PSESSION_STARTED) {
         textbox.setText(intent.getByteArrayExtra("topic").toString() 
                 + intent.getByteArrayExtra("payload").toString());
         }
+    }
+    
+    /**
+     * Toggle whether starting or stopping
+     */
+    protected static boolean psessionOngoing = false;
+    private void togglePsession() {
+        if (!psessionOngoing)
+            mBoundService.startPsession();
+        else
+            mBoundService.stopPsession();
+        psessionOngoing = !psessionOngoing;
     }
 }
