@@ -14,6 +14,8 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,8 +25,8 @@ import android.widget.Toast;
  */
 
 public class Participate extends Activity {
-    public static final String ACTION_PSESSION_STARTED = 
-        "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION_STARTED";
+    public static final String ACTION_PSESSION = 
+        "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION";
     
     private TextView textbox;
     private SharedPreferences prefs;
@@ -44,7 +46,15 @@ public class Participate extends Activity {
                 Messager.class), mConnection, Context.BIND_AUTO_CREATE);
     }
     
+    @Override
+    public void onDestroy() {
+        unbindService(mConnection);
+    }
+    
     private Messager mBoundService;
+    
+    /** Registered information bundle */
+    private Bundle regInfo;
     
     private ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
@@ -56,11 +66,16 @@ public class Participate extends Activity {
             mBoundService = ((Messager.LocalBinder)service).getService();
             
             // Attempt to register
-            mBoundService.registerUser(prefs.getString("userId", "0"));
-            // mBoundService.registerUser();
-            // Tell the user about this for our demo.
-            Toast.makeText(Participate.this, "connected to Messager",
-                    Toast.LENGTH_SHORT).show();
+            Participate.this.registerUser();
+            // Should this be in the above function?
+            Button togglePsession_button = (Button) findViewById(R.id.togglePsessionButton);
+            togglePsession_button.setVisibility(View.VISIBLE);
+            togglePsession_button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    togglePsession();
+                }
+            });
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -104,7 +119,7 @@ public class Participate extends Activity {
                                     // perform necessary stuff.
                                     prefsedit.putString("userId", input.getText().toString());
                                     prefsedit.commit();
-                                    mBoundService.registerUser(input.getText().toString());
+                                    registerUser();
                                 }
                             }).setNegativeButton(android.R.string.cancel,
                             new DialogInterface.OnClickListener() {
@@ -118,7 +133,6 @@ public class Participate extends Activity {
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        Log.i("pressed", Integer.toString(keyCode));
         switch(keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
                 togglePsession();
@@ -129,9 +143,25 @@ public class Participate extends Activity {
 
     @Override
     protected void onNewIntent (Intent intent) {
-        if (intent.getAction() == Participate.ACTION_PSESSION_STARTED) {
-        textbox.setText(intent.getByteArrayExtra("topic").toString() 
-                + intent.getByteArrayExtra("payload").toString());
+        Log.d("newintent", "intent received" + intent.getAction());
+        if (intent.getAction().equals(Participate.ACTION_PSESSION)) {
+
+            Log.d("bundle", "here");
+            Bundle b = intent.getBundleExtra(Participate.ACTION_PSESSION);
+            /*
+             * TODO Possibly remove the coupling by moving all the constants
+             * to Participate class.
+             */
+            if (b.getString("action").equals(Messager.ACTION_START)) {
+                // TODO
+                textbox.setText(b.getString("name") + " has started speaking");
+            } else if (b.getString("action").equals(Messager.ACTION_STOP)) {
+                // TODO
+                textbox.setText(b.getString("name") + " has stopped speaking");
+            } else if (b.getString("action").equals(Messager.ACTION_PIND)) {
+                // TODO
+            }
+            Log.d("bundle", b.getString("action"));
         }
     }
     
@@ -145,5 +175,25 @@ public class Participate extends Activity {
         else
             mBoundService.stopPsession();
         psessionOngoing = !psessionOngoing;
+        
+
+//        if(psessionOngoing)
+//            ((Button) v).setText("Stop");
+//        else
+//            ((Button) v).setText("Start");
+    }
+    
+    /**
+     * Tell Messager to register the user
+     * also updates the text fields and the registration information
+     */
+    protected void registerUser() {
+        TextView userId_box = (TextView) findViewById(R.id.userId);
+        TextView classTitle_box = (TextView) findViewById(R.id.classTitle);
+        regInfo = mBoundService.registerUser(prefs.getString("userId", "0"));
+
+        // TODO Friendly messages. Adjust later. 
+        userId_box.setText("Hi there " + regInfo.getString("name") + "!");
+        classTitle_box.setText("You are in " + regInfo.getString("classTitle") + " now.");
     }
 }
