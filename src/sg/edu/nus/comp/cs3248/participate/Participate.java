@@ -2,6 +2,8 @@ package sg.edu.nus.comp.cs3248.participate;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
+import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -9,6 +11,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -25,57 +28,82 @@ import android.widget.Toast;
  */
 
 public class Participate extends Activity {
-    public static final String ACTION_PSESSION = 
-        "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION";
-    
+    public static final String ACTION_PSESSION =
+            "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION";
+
     private TextView textbox;
     private SharedPreferences prefs;
     private SharedPreferences.Editor prefsedit;
+
+    final Handler mHandler = new Handler();
+
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
-        
+
         textbox = (TextView) findViewById(R.id.textbox);
-        prefs = getSharedPreferences(getString(R.string.app_name), MODE_PRIVATE);
+        prefs =
+                getSharedPreferences(getString(R.string.app_name), MODE_PRIVATE);
         prefsedit = prefs.edit();
         
+        findViewById(R.id.togglePsessionButton).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                togglePsession();
+            }
+        });
+
         // put this in a thread?
-        bindService(new Intent(Participate.this, 
-                Messager.class), mConnection, Context.BIND_AUTO_CREATE);
+        new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                bindService(new Intent(Participate.this, Messager.class),
+                        mConnection, Context.BIND_AUTO_CREATE);
+            }
+        }).start();
     }
-    
+
     @Override
     public void onDestroy() {
+        super.onDestroy();
         unbindService(mConnection);
     }
     
+    final int REGISTER_PROGRESS = 0;
+    @Override
+    protected Dialog onCreateDialog(int id) {
+        switch (id) {
+            case REGISTER_PROGRESS: {
+                ProgressDialog dialog = new ProgressDialog(this);
+                dialog.setTitle("Registering");
+                dialog.setMessage("We're logging you in, please be patient.");
+                dialog.setIndeterminate(true);
+                dialog.setCancelable(true);
+                return dialog;
+            }
+        }
+        return null;
+    }
+
     private Messager mBoundService;
-    
+
     /** Registered information bundle */
     private Bundle regInfo;
-    
+
     private ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
             // This is called when the connection with the service has been
             // established, giving us the service object we can use to
-            // interact with the service.  Because we have bound to a explicit
+            // interact with the service. Because we have bound to a explicit
             // service that we know is running in our own process, we can
             // cast its IBinder to a concrete class and directly access it.
-            mBoundService = ((Messager.LocalBinder)service).getService();
-            
+            mBoundService = ((Messager.LocalBinder) service).getService();
+
             // Attempt to register
             Participate.this.registerUser();
-            // Should this be in the above function?
-            Button togglePsession_button = (Button) findViewById(R.id.togglePsessionButton);
-            togglePsession_button.setVisibility(View.VISIBLE);
-            togglePsession_button.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    togglePsession();
-                }
-            });
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -84,7 +112,7 @@ public class Participate extends Activity {
             // Because it is running in our same process, we should never
             // see this happen.
             mBoundService = null;
-            Toast.makeText(Participate.this, "disconnected!!",
+            Toast.makeText(Participate.this, "Disconnected!!",
                     Toast.LENGTH_SHORT).show();
         }
     };
@@ -117,7 +145,14 @@ public class Participate extends Activity {
                                     // login by checking whether this user is in
                                     // a class
                                     // perform necessary stuff.
-                                    prefsedit.putString("userId", input.getText().toString());
+                                    
+                                    // No changes, don't do anything.
+                                    if (prefs.getString("userId", "").equals(input.getText().toString()))
+                                        return;
+
+                                    // Commit the changes and register the user.
+                                    prefsedit.putString("userId", input
+                                            .getText().toString());
                                     prefsedit.commit();
                                     registerUser();
                                 }
@@ -133,24 +168,24 @@ public class Participate extends Activity {
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        switch(keyCode) {
-            case KeyEvent.KEYCODE_DPAD_CENTER:
-                togglePsession();
-                return true;
+        switch (keyCode) {
+        case KeyEvent.KEYCODE_DPAD_CENTER:
+            togglePsession();
+            return true;
         }
         return false;
     }
 
     @Override
-    protected void onNewIntent (Intent intent) {
+    protected void onNewIntent(Intent intent) {
         Log.d("newintent", "intent received" + intent.getAction());
         if (intent.getAction().equals(Participate.ACTION_PSESSION)) {
 
             Log.d("bundle", "here");
             Bundle b = intent.getBundleExtra(Participate.ACTION_PSESSION);
             /*
-             * TODO Possibly remove the coupling by moving all the constants
-             * to Participate class.
+             * TODO Possibly remove the coupling by moving all the constants to
+             * Participate class.
              */
             if (b.getString("action").equals(Messager.ACTION_START)) {
                 // TODO
@@ -164,36 +199,58 @@ public class Participate extends Activity {
             Log.d("bundle", b.getString("action"));
         }
     }
-    
+
     /**
      * Toggle whether starting or stopping
      */
     protected static boolean psessionOngoing = false;
-    private void togglePsession() {
-        if (!psessionOngoing)
-            mBoundService.startPsession();
-        else
-            mBoundService.stopPsession();
-        psessionOngoing = !psessionOngoing;
-        
 
-//        if(psessionOngoing)
-//            ((Button) v).setText("Stop");
-//        else
-//            ((Button) v).setText("Start");
+    private void togglePsession() {
+        if (!psessionOngoing) {
+            mBoundService.startPsession();
+            ((Button) findViewById(R.id.togglePsessionButton)).setText("Stop");
+        } else {
+            // Stop the session
+            mBoundService.stopPsession();
+            ((Button) findViewById(R.id.togglePsessionButton)).setText("Start");
+        }
+        psessionOngoing = !psessionOngoing;
     }
-    
+
+    final Runnable updateUiText = new Runnable() {
+        @Override
+        public void run() {
+            TextView userId_box = (TextView) findViewById(R.id.userId);
+            TextView classTitle_box = (TextView) findViewById(R.id.classTitle);
+
+            // TODO Friendly messages. Adjust later.
+            userId_box.setText(regInfo.getString("name"));
+            classTitle_box.setText(regInfo.getString("classTitle"));
+            // Following line is unnecessary
+            findViewById(R.id.togglePsessionButton).setVisibility(View.VISIBLE);
+            dismissDialog(REGISTER_PROGRESS);
+        }
+    };
+
     /**
-     * Tell Messager to register the user
-     * also updates the text fields and the registration information
+     * Tell Messager to register the user also updates the text fields and the
+     * registration information
      */
     protected void registerUser() {
-        TextView userId_box = (TextView) findViewById(R.id.userId);
-        TextView classTitle_box = (TextView) findViewById(R.id.classTitle);
-        regInfo = mBoundService.registerUser(prefs.getString("userId", "0"));
-
-        // TODO Friendly messages. Adjust later. 
-        userId_box.setText("Hi there " + regInfo.getString("name") + "!");
-        classTitle_box.setText("You are in " + regInfo.getString("classTitle") + " now.");
+        showDialog(REGISTER_PROGRESS);
+        // These are actually unnecessary but oh well
+        ((TextView) findViewById(R.id.userId)).setText("");
+        ((TextView) findViewById(R.id.classTitle)).setText("");
+        findViewById(R.id.togglePsessionButton).setVisibility(View.INVISIBLE);
+        // Changing the views.
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                regInfo =
+                        mBoundService.registerUser(prefs.getString("userId",
+                                "0"));
+                mHandler.post(updateUiText);
+            }
+        }).start();
     }
 }

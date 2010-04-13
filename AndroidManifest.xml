@@ -14,5 +14,6 @@
     <service android:name="Messager"></service>
 </application>
 <uses-permission android:name="android.permission.INTERNET"></uses-permission>
-<uses-sdk android:minSdkVersion="2"></uses-sdk>
+<uses-permission android:name="android.permission.READ_PHONE_STATE"></uses-permission>
+<uses-sdk android:minSdkVersion="3"></uses-sdk>
 </manifest> 

@@ -1,27 +1,25 @@
 package sg.edu.nus.comp.cs3248.participate;
 
-import java.lang.reflect.Array;
-import java.util.Arrays;
+import java.net.URLEncoder;
+import java.util.Random;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONStringer;
-import org.json.JSONTokener;
 
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.telephony.TelephonyManager;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.ibm.mqtt.IMqttClient;
 import com.ibm.mqtt.MqttClient;
@@ -45,6 +43,14 @@ public class Messager extends Service implements MqttSimpleCallback {
     private String profileId = "0";
 
     private String classId = "0";
+    
+    /**
+     * The clientId for communicating with the MQTT server
+     * This is set to the DeviceId during at the beginning.
+     * IF the DeviceId is null (emulator? or no SIM?) then
+     * set to a random number converted into a hex string.
+     */
+    private String clientId;
 
     public class LocalBinder extends Binder {
         Messager getService() {
@@ -58,8 +64,19 @@ public class Messager extends Service implements MqttSimpleCallback {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Create the client
+        clientId = ((TelephonyManager) 
+                getSystemService(Context.TELEPHONY_SERVICE)).getDeviceId();
+        /*
+         *  If for some reason it's too long for MQTT spec or
+         *  it can't be obtained... (emulator??) 
+         *  This may still cause collisions with other clients
+         *  but just restart if that happens?
+         */
+        if(clientId == null || clientId.equals("000000000000000") || clientId.length() > 23) {
+            clientId = Integer.toHexString(new Random().nextInt());
+        }
 
+        // Create the client
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -80,21 +97,29 @@ public class Messager extends Service implements MqttSimpleCallback {
         }).start();
     }
 
-    private void connectToBroker() {
-        Log.i("Connecting", "Attempt");
+    /**
+     * Connect to the broker
+     * @return true if connected, otherwise false. This is helpful for 
+     * attempting to reconnect.
+     */
+    private boolean connectToBroker() {
         try {
-            Log.i("Connecting", "connecting to broker");
-            mqttClient.connect(getString(R.string.app_name), false, (short) 5);
+            Log.i("Connecting", "connecting to broker with clientId: " + clientId);
+            mqttClient.connect(clientId, true, (short) 5);
             // check whether the keepalive works when the device is asleep
             Log.i("Connecting", "connected");
         } catch (Exception e) {
             // do nothing
+            /*
             Toast.makeText(Messager.this, "Failed to connect"
                     + e.getCause().getMessage(), Toast.LENGTH_SHORT);
+*/
             Log
                     .e("Connecting", "Failed to connect"
                             + e.getCause().getMessage());
+            return false;
         }
+        return true;
     }
 
     @Override
@@ -133,44 +158,46 @@ public class Messager extends Service implements MqttSimpleCallback {
             Log.e("publish arrived json", e.getMessage());
             return;
         }
-        // Process into a bundle
-        
-        Bundle bnd = new Bundle();
-        /*
-         * TODO Three types of actions.
-         * - Start
-         *   Here we need to tell the interface who has started talking
-         * - Stop
-         *   Here we need to tell the interface that the person has stopped talking
-         * - Psession indicator
-         *   Here we need to notify the interface on what is the psession of the
-         *   that the user is rating for that interface element (button or whatever)
-         *   Interface may hold a queue or whatever to keep this...
-         */
         try {
-            bnd.putString("name", payloadObj.getString("name"));
-            bnd.putString("userId", payloadObj.getString("userId"));
-            bnd.putString("profileId", payloadObj.getString("id"));
-            if (topicArr[0].equals(ACTION_START)) {
-            } else if (topicArr[0].equals(ACTION_STOP)) {
-                // TODO
-            } else if (topicArr[0].equals(ACTION_PIND)) {
-                // TODO
+            // Check that it's not myself. :)
+            if (!payloadObj.getString("id").equals(profileId)) {
+                // Process into a bundle
+                Bundle bnd = new Bundle();
+                /*
+                 * TODO Three types of actions.
+                 * - Start
+                 *   Here we need to tell the interface who has started talking
+                 * - Stop
+                 *   Here we need to tell the interface that the person has stopped talking
+                 * - Psession indicator
+                 *   Here we need to notify the interface on what is the psession of the
+                 *   that the user is rating for that interface element (button or whatever)
+                 *   Interface may hold a queue or whatever to keep this...
+                 */
+                bnd.putString("name", payloadObj.getString("name"));
+                bnd.putString("userId", payloadObj.getString("userId"));
+                bnd.putString("profileId", payloadObj.getString("id"));
+                if (topicArr[0].equals(ACTION_START)) {
+                } else if (topicArr[0].equals(ACTION_STOP)) {
+                    // TODO
+                } else if (topicArr[0].equals(ACTION_PIND)) {
+                    // TODO
+                }
+
+                bnd.putString("action", topicArr[0]);
+                // bnd.putString("payload", new String(payload));
+
+                // TODO This is a bit lame. Fix later.
+                if (!Participate.psessionOngoing) {
+                    // Either do some processing here or throw it in.
+                    startActivity((new Intent(Participate.ACTION_PSESSION, null, 
+                            Messager.this, Participate.class))
+                            .putExtra(Participate.ACTION_PSESSION, bnd)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                }
             }
         } catch (JSONException e) {
             Log.e("publish json", e.getMessage());
-        }
-        
-        bnd.putString("action", topicArr[0]);
-        // bnd.putString("payload", new String(payload));
-
-        // TODO This is a bit lame. Fix later.
-        if (!Participate.psessionOngoing) {
-            // Either do some processing here or throw it in.
-            startActivity((new Intent(Participate.ACTION_PSESSION, null, 
-                    Messager.this, Participate.class))
-                    .putExtra(Participate.ACTION_PSESSION, bnd)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         }
     }
 
@@ -179,15 +206,46 @@ public class Messager extends Service implements MqttSimpleCallback {
      */
     @Override
     public void connectionLost() throws Exception {
-        Toast.makeText(Messager.this, "Connection Lost", Toast.LENGTH_SHORT);
+        Log.i("messager connection", "lost");
         // TODO Check whether this is the correct way to do this?
+        // TODO Notify the UI thread that the connection has been lost?
         // Reconnect
         new Thread(new Runnable() {
             @Override
             public void run() {
-                connectToBroker();
+                boolean success = false;
+                for (int i = 0; i < 5; i++) {
+                    if(success = connectToBroker())
+                        break;
+                    else {
+                        try {
+                            // sleep a bit before retry? better to be exponential
+                            Thread.sleep((long) Math.pow(3, i));
+                        } catch (InterruptedException e) {
+                        }
+                    }
+                }
+                if (!success) {
+                   // TODO Perform stuff to say we have given up! 
+                } else {
+                    subscribeClass();
+                }
             }
         }).start();
+    }
+    
+    /**
+     * Helper to subscribe to the current classId
+     */
+    private void subscribeClass() {
+        String[] topics = { ACTION_STOP + "/" + classId , ACTION_START + "/" + classId };
+        // TODO change qos
+        int[] qoses = { 1, 1 };
+        try {
+            mqttClient.subscribe(topics, qoses);
+        } catch (Exception e) {
+            Log.e("register", e.getMessage() + "");
+        }
     }
 
     /**
@@ -216,9 +274,20 @@ public class Messager extends Service implements MqttSimpleCallback {
      * @return the classId
      */
     public Bundle registerUser(String userId) {
+        // Ensure that blanks are filled
+        if (userId.equals(""))
+            userId = "0";
+        else {
+            try {
+                // Ensure it's safe to put in URL
+                userId = URLEncoder.encode(userId, "UTF-8");
+            } catch (Exception e) {
+                Log.e("register encoding", e.getMessage());
+            }
+        }
         // Unsubscribe from the old class
         if (!classId.equals("0")) {
-            String[] unsubtopics = { "start/" + classId , "stop/" + classId };
+            String[] unsubtopics = { ACTION_START+ "/" + classId , ACTION_STOP + "/" + classId };
             try {
                 mqttClient.unsubscribe(unsubtopics);
             } catch (Exception e) {
@@ -262,13 +331,7 @@ public class Messager extends Service implements MqttSimpleCallback {
         } catch (Exception e) {
             Log.e("register user", e.getMessage());
         }
-        String[] topics = { "start/" + classId , "stop/" + classId };
-        int[] qoses = { 0, 0 };
-        try {
-            mqttClient.subscribe(topics, qoses);
-        } catch (Exception e) {
-            Log.e("register", e.getMessage());
-        }
+        subscribeClass();
         Log.d("register", "Done");
 
         return result;
@@ -281,7 +344,7 @@ public class Messager extends Service implements MqttSimpleCallback {
      * @return the psessionId
      */
     public String startPsession() {
-        sendMsg("start/" + classId, profile.toString());
+        sendMsg(ACTION_START + "/" + classId, profile.toString());
         
 //        new JSONStringer()
 //        .object()
@@ -306,7 +369,7 @@ public class Messager extends Service implements MqttSimpleCallback {
      * @return not sure what
      */
     public String stopPsession() {
-        sendMsg(ACTION_STOP + "/" + classId, profileId);
+        sendMsg(ACTION_STOP + "/" + classId, profile.toString());
         new Thread(new Runnable() {
             @Override
             public void run() {
