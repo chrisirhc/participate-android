@@ -13,6 +13,8 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Vibrator;
+import android.text.InputType;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -35,6 +37,8 @@ public class Participate extends Activity {
     private SharedPreferences prefs;
     private SharedPreferences.Editor prefsedit;
 
+    Vibrator systemVibrator;
+
     final Handler mHandler = new Handler();
 
     /** Called when the activity is first created. */
@@ -43,17 +47,19 @@ public class Participate extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
+        systemVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         textbox = (TextView) findViewById(R.id.textbox);
         prefs =
                 getSharedPreferences(getString(R.string.app_name), MODE_PRIVATE);
         prefsedit = prefs.edit();
-        
-        findViewById(R.id.togglePsessionButton).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                togglePsession();
-            }
-        });
+
+        findViewById(R.id.togglePsessionButton).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        togglePsession();
+                    }
+                });
 
         // put this in a thread?
         new Thread(new Runnable() {
@@ -70,22 +76,6 @@ public class Participate extends Activity {
     public void onDestroy() {
         super.onDestroy();
         unbindService(mConnection);
-    }
-    
-    final int REGISTER_PROGRESS = 0;
-    @Override
-    protected Dialog onCreateDialog(int id) {
-        switch (id) {
-            case REGISTER_PROGRESS: {
-                ProgressDialog dialog = new ProgressDialog(this);
-                dialog.setTitle("Registering");
-                dialog.setMessage("We're logging you in, please be patient.");
-                dialog.setIndeterminate(true);
-                dialog.setCancelable(true);
-                return dialog;
-            }
-        }
-        return null;
     }
 
     private Messager mBoundService;
@@ -133,6 +123,8 @@ public class Participate extends Activity {
         switch (item.getItemId()) {
         case MENU_REGISTER:
             final EditText input = new EditText(this);
+            input.setInputType(InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+            input.setHint("U081234A");
             input.setText(prefs.getString("userId", ""));
             // t, TextView.BufferType.EDITABLE
             new AlertDialog.Builder(Participate.this).setTitle("Registration")
@@ -145,9 +137,10 @@ public class Participate extends Activity {
                                     // login by checking whether this user is in
                                     // a class
                                     // perform necessary stuff.
-                                    
+
                                     // No changes, don't do anything.
-                                    if (prefs.getString("userId", "").equals(input.getText().toString()))
+                                    if (prefs.getString("userId", "").equals(
+                                            input.getText().toString()))
                                         return;
 
                                     // Commit the changes and register the user.
@@ -215,6 +208,24 @@ public class Participate extends Activity {
             ((Button) findViewById(R.id.togglePsessionButton)).setText("Start");
         }
         psessionOngoing = !psessionOngoing;
+        systemVibrator.vibrate(100);
+    }
+
+    final int REGISTER_PROGRESS = 0;
+
+    @Override
+    protected Dialog onCreateDialog(int id) {
+        switch (id) {
+        case REGISTER_PROGRESS: {
+            ProgressDialog dialog = new ProgressDialog(this);
+            dialog.setTitle("Registering");
+            dialog.setMessage("We're logging you in, please be patient.");
+            dialog.setIndeterminate(true);
+            dialog.setCancelable(false);
+            return dialog;
+        }
+        }
+        return null;
     }
 
     final Runnable updateUiText = new Runnable() {
