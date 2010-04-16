@@ -4,9 +4,18 @@ import java.net.URLEncoder;
 import java.util.Random;
 
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpVersion;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.DefaultedHttpParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.params.HttpProtocolParams;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -17,7 +26,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Process;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
@@ -44,6 +56,11 @@ public class Messager extends Service implements MqttSimpleCallback {
 
     private String classId = "0";
     
+    private String psessionId = "0";
+    
+    private Handler requestHandler;
+    private HandlerThread requestHandlerThread;
+    
     /**
      * The clientId for communicating with the MQTT server
      * This is set to the DeviceId during at the beginning.
@@ -60,6 +77,7 @@ public class Messager extends Service implements MqttSimpleCallback {
 
     IMqttClient mqttClient = null;
     HttpClient httpClient;
+    public boolean isConnected = false;
 
     @Override
     public void onCreate() {
@@ -75,26 +93,44 @@ public class Messager extends Service implements MqttSimpleCallback {
         if(clientId == null || clientId.equals("000000000000000") || clientId.length() > 23) {
             clientId = Integer.toHexString(new Random().nextInt());
         }
-
-        // Create the client
-        new Thread(new Runnable() {
+        
+        // since requests must be handled in order create a looper for it
+        requestHandlerThread = new HandlerThread("requestHandler", Process.THREAD_PRIORITY_MORE_FAVORABLE) {
             @Override
-            public void run() {
-                httpClient = new DefaultHttpClient();
-                try {
-                    mqttClient =
-                            MqttClient.createMqttClient("tcp://"
-                                    + BACKEND_HOSTNAME + "@1883", null);
-                    // register this client app has being able to receive
-                    // messages
-                    mqttClient.registerSimpleHandler(Messager.this);
-                } catch (Exception e) {
+            protected void onLooperPrepared() {
+                super.onLooperPrepared();
+                requestHandler = new Handler(this.getLooper());
+                // Create the client
+                requestHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        // code from http://code.google.com/p/android/issues/detail?id=2690#c10
+                        HttpParams params = new BasicHttpParams();
+                        HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1);
+                        HttpProtocolParams.setContentCharset(params, "UTF-8");
+                        HttpProtocolParams.setUseExpectContinue(params, true);
+                        SchemeRegistry supportedSchemes = new SchemeRegistry();
+                        supportedSchemes.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
 
-                }
-                // connect
-                connectToBroker();
+                        httpClient = new DefaultHttpClient(
+                                new ThreadSafeClientConnManager(params, supportedSchemes), params);
+                        try {
+                            mqttClient =
+                                MqttClient.createMqttClient("tcp://"
+                                        + BACKEND_HOSTNAME + "@1883", null);
+                            // register this client app has being able to receive
+                            // messages
+                            mqttClient.registerSimpleHandler(Messager.this);
+                        } catch (Exception e) {
+
+                        }
+                        // connect
+                        isConnected = connectToBroker();
+                    }
+                });
             }
-        }).start();
+        };
+        requestHandlerThread.start();
     }
 
     /**
@@ -150,17 +186,20 @@ public class Messager extends Service implements MqttSimpleCallback {
         // This should be in the format: command/class/somethingelse
         Log.d("message arrived", payload.toString());
         String[] topicArr = topicName.split("\\/");
-        JSONObject payloadObj;
+        JSONObject payloadObj, payloadProfile;
         try {
             payloadObj = new JSONObject(new String(payload));
         } catch (JSONException e) {
             // TODO handle this exception
-            Log.e("publish arrived json", e.getMessage());
+            Log.e("participate", e.getMessage());
             return;
         }
         try {
             // Check that it's not myself. :)
-            if (!payloadObj.getString("id").equals(profileId)) {
+            // if there is no profile, do nothing. I'm not sure what to do...
+            if (payloadObj.has("profile") 
+                    && !payloadObj.getJSONObject("profile").getString("id").equals(profileId)) {
+                payloadProfile = payloadObj.getJSONObject("profile");
                 // Process into a bundle
                 Bundle bnd = new Bundle();
                 /*
@@ -174,12 +213,13 @@ public class Messager extends Service implements MqttSimpleCallback {
                  *   that the user is rating for that interface element (button or whatever)
                  *   Interface may hold a queue or whatever to keep this...
                  */
-                bnd.putString("name", payloadObj.getString("name"));
-                bnd.putString("userId", payloadObj.getString("userId"));
-                bnd.putString("profileId", payloadObj.getString("id"));
+                bnd.putString("name", payloadProfile.getString("name"));
+                bnd.putString("userId", payloadProfile.getString("userId"));
+                bnd.putString("profileId", payloadProfile.getString("id"));
                 if (topicArr[0].equals(ACTION_START)) {
                 } else if (topicArr[0].equals(ACTION_STOP)) {
                     // TODO
+                    bnd.putString("psessionId", payloadObj.getString("psessionId"));
                 } else if (topicArr[0].equals(ACTION_PIND)) {
                     // TODO
                 }
@@ -207,12 +247,13 @@ public class Messager extends Service implements MqttSimpleCallback {
     @Override
     public void connectionLost() throws Exception {
         Log.i("messager connection", "lost");
-        // TODO Check whether this is the correct way to do this?
         // TODO Notify the UI thread that the connection has been lost?
         // Reconnect
-        new Thread(new Runnable() {
+        requestHandler.postAtFrontOfQueue(new Runnable() {
             @Override
             public void run() {
+                if(mqttClient.isConnected())
+                    return;
                 boolean success = false;
                 for (int i = 0; i < 5; i++) {
                     if(success = connectToBroker())
@@ -231,7 +272,7 @@ public class Messager extends Service implements MqttSimpleCallback {
                     subscribeClass();
                 }
             }
-        }).start();
+        });
     }
     
     /**
@@ -274,6 +315,7 @@ public class Messager extends Service implements MqttSimpleCallback {
      * @return the classId
      */
     public Bundle registerUser(String userId) {
+        Bundle result = new Bundle();
         // Ensure that blanks are filled
         if (userId.equals(""))
             userId = "0";
@@ -295,11 +337,10 @@ public class Messager extends Service implements MqttSimpleCallback {
             }
         }
 
-        Bundle result = new Bundle();
         // Get the class
         HttpGet toget =
-                new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/getProfileId/"
-                        + userId);
+            new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/getProfileId/"
+                    + userId);
         HttpResponse resp;
         JSONObject respObj;
         try {
@@ -312,13 +353,13 @@ public class Messager extends Service implements MqttSimpleCallback {
                 profileId = profile.getString("id");
 
                 HttpGet togetclass =
-                        new HttpGet(
-                                "http://"+ BACKEND_MODEL_HOSTNAME +"/register/"
-                                        + profileId);
+                    new HttpGet(
+                            "http://"+ BACKEND_MODEL_HOSTNAME +"/register/"
+                            + profileId);
 
                 resp = httpClient.execute(togetclass);
                 respObj =
-                        new JSONObject(EntityUtils.toString(resp.getEntity()));
+                    new JSONObject(EntityUtils.toString(resp.getEntity()));
                 if (respObj.getBoolean("ok")) {
                     pclass = respObj.getJSONObject("pclass");
                     classId = pclass.getString("id");
@@ -333,7 +374,6 @@ public class Messager extends Service implements MqttSimpleCallback {
         }
         subscribeClass();
         Log.d("register", "Done");
-
         return result;
     }
 
@@ -341,25 +381,38 @@ public class Messager extends Service implements MqttSimpleCallback {
      * Begin a participation session (psession) Sends Topic: start/[classId]
      * Body JSONObjects...
      * 
-     * @return the psessionId
      */
-    public String startPsession() {
-        sendMsg(ACTION_START + "/" + classId, profile.toString());
+    public void startPsession() {
+        try {
+            sendMsg(ACTION_START + "/" + classId, new JSONStringer().object()
+            .key("profile").value(profile).endObject().toString());
+        } catch (JSONException e) {
+            Log.e("participate", "stop session: " + e.getMessage());
+        }
         
-//        new JSONStringer()
-//        .object()
-//            .key("profile").value(profile)
-//        .endObject()
-        new Thread(new Runnable() {
+        // TODO if within a threshold time then don't send out HTTP so that it won't be recorded.
+        requestHandler.post(new Runnable() {
             @Override
             public void run() {
                 // TODO Psession indicator mentioned above
                 // Here we may need to do another sendMsg so that the others know
                 // the current Psession? This is to support multiple Psessions
+                try {
+                    HttpGet toget =
+                        new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/psession/start/"
+                                + profileId);
+                    HttpResponse resp = httpClient.execute(toget);
+                    String respString = EntityUtils.toString(resp.getEntity());
+                    Log.i("participate", "received from the server: " + respString);
+                    // set the psessionId to be
+                    psessionId = new JSONObject(respString)
+                                .getJSONObject("psession").getString("id");
+                } catch (Exception e) {
+                    Log.e("participate", "http error" + e.getMessage());
+                }
             }
-        }).start();
+        });
         // Do HTTP operation to get the psession id from the server in another thread
-        return null;
     }
 
     /**
@@ -369,15 +422,31 @@ public class Messager extends Service implements MqttSimpleCallback {
      * @return not sure what
      */
     public String stopPsession() {
-        sendMsg(ACTION_STOP + "/" + classId, profile.toString());
-        new Thread(new Runnable() {
+        try {
+            sendMsg(ACTION_STOP + "/" + classId, new JSONStringer().object()
+            .key("psessionId").value(psessionId)
+            .key("profile").value(profile).endObject().toString());
+        } catch (JSONException e) {
+            Log.e("stopPsession", e.getMessage());
+        }
+        requestHandler.post(new Runnable() {
             @Override
             public void run() {
                 // TODO Auto-generated method stub
                 // Send the record to the server to keep
                 // This for the flower to show? and statistics
+                try {
+                    Log.i("participate http", "attempting");
+                    HttpGet toget =
+                        new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/psession/stop/"
+                                + profileId);
+                    HttpResponse resp = httpClient.execute(toget);
+                    Log.i("participate http", EntityUtils.toString(resp.getEntity()));
+                } catch (Exception e) {
+                    Log.e("participate http", e.getMessage());
+                }
             }
-        }).start();
+        });
         // Finish up the session on the server on another thread
         return null;
     }
@@ -386,10 +455,30 @@ public class Messager extends Service implements MqttSimpleCallback {
      * Sends via HTTP? rate/[classId]/[userId]/[psessionId]/[rating] Is this to
      * be sent or HTTPed? may not be time-sensitive so... nah
      * 
-     * @return
      */
-    public String ratePsession() {
-        return null;
+    // TODO test whether this works
+    public void ratePsession(final String psId) {
+        // TODO if a rating is made earlier, just let the interface keep it until stop is sent
+        requestHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                // TODO Auto-generated method stub
+                // Send the record to the server to keep
+                // This for the flower to show? and statistics
+                try {
+                    Log.i("participate", "attempting " + "http://"+ BACKEND_MODEL_HOSTNAME +"/rate/"
+                                + profileId + "/" + psId);
+                    HttpGet toget =
+                        new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/rate/"
+                                + profileId + "/" + psId);
+                    HttpResponse resp = httpClient.execute(toget);
+                    Log.i("participate", EntityUtils.toString(resp.getEntity()));
+                } catch (Exception e) {
+                    Log.e("participate", e.getMessage());
+                }
+            }
+        });
+        
     }
 
     /**

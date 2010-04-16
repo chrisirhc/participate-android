@@ -19,6 +19,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -168,6 +169,30 @@ public class Participate extends Activity {
         }
         return false;
     }
+    
+    final static float STROKETHRESHOLD = 100;
+    float lastY = 0;
+    // To implement the rating system
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        // TODO Auto-generated method stub
+        switch(event.getAction()) {
+        case MotionEvent.ACTION_DOWN:
+            lastY = event.getY();
+            break;
+        case MotionEvent.ACTION_MOVE:
+            if (event.getY() - lastY > STROKETHRESHOLD) {
+                rateCurrent(true);
+                return true;
+            } else if (event.getY() - lastY < -STROKETHRESHOLD) {
+                rateCurrent(false);
+                return true;
+            }
+            Log.d("participate", "event history size:" + Float.toString(event.getY()));
+            break;
+        }
+        return super.onTouchEvent(event);
+    }
 
     @Override
     protected void onNewIntent(Intent intent) {
@@ -184,8 +209,12 @@ public class Participate extends Activity {
                 // TODO
                 textbox.setText(b.getString("name") + " has started speaking");
             } else if (b.getString("action").equals(Messager.ACTION_STOP)) {
-                // TODO
+                // TODO send rating or start counting down
                 textbox.setText(b.getString("name") + " has stopped speaking");
+                if (ratedCurrent) {
+                    mBoundService.ratePsession(b.getString("psessionId"));
+                    ratedCurrent = false;
+                }
             } else if (b.getString("action").equals(Messager.ACTION_PIND)) {
                 // TODO
             }
@@ -197,6 +226,8 @@ public class Participate extends Activity {
      * Toggle whether starting or stopping
      */
     protected static boolean psessionOngoing = false;
+    
+    final static long QUICKVIBRATE = 100;
 
     private void togglePsession() {
         if (!psessionOngoing) {
@@ -208,7 +239,7 @@ public class Participate extends Activity {
             ((Button) findViewById(R.id.togglePsessionButton)).setText("Start");
         }
         psessionOngoing = !psessionOngoing;
-        systemVibrator.vibrate(100);
+        systemVibrator.vibrate(QUICKVIBRATE);
     }
 
     final int REGISTER_PROGRESS = 0;
@@ -216,14 +247,21 @@ public class Participate extends Activity {
     @Override
     protected Dialog onCreateDialog(int id) {
         switch (id) {
-        case REGISTER_PROGRESS: {
+        case REGISTER_PROGRESS: 
             ProgressDialog dialog = new ProgressDialog(this);
             dialog.setTitle("Registering");
             dialog.setMessage("We're logging you in, please be patient.");
             dialog.setIndeterminate(true);
-            dialog.setCancelable(false);
+            dialog.setCancelable(true);
+            dialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+                @Override
+                public void onCancel(DialogInterface dialog) {
+                    // if it's not connected, close the app
+                    if(!mBoundService.isConnected)
+                        Participate.this.finish();
+                }
+            });
             return dialog;
-        }
         }
         return null;
     }
@@ -263,5 +301,18 @@ public class Participate extends Activity {
                 mHandler.post(updateUiText);
             }
         }).start();
+    }
+    
+    private boolean ratedCurrent = false;
+    private void rateCurrent(boolean rc) {
+        if (ratedCurrent != rc) {
+            systemVibrator.vibrate(QUICKVIBRATE);
+            ratedCurrent = rc;
+            if(rc)
+                textbox.setText("starred!");
+            else
+                textbox.setText("nostarred!");
+        }
+        // vibrate when this is changed
     }
 }
