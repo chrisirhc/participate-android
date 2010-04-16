@@ -182,10 +182,10 @@ public class Participate extends Activity {
             break;
         case MotionEvent.ACTION_MOVE:
             if (event.getY() - lastY > STROKETHRESHOLD) {
-                rateCurrent(true);
+                rateCurrent(false);
                 return true;
             } else if (event.getY() - lastY < -STROKETHRESHOLD) {
-                rateCurrent(false);
+                rateCurrent(true);
                 return true;
             }
             Log.d("participate", "event history size:" + Float.toString(event.getY()));
