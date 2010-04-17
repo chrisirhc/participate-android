@@ -7,6 +7,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.HttpVersion;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.scheme.PlainSocketFactory;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
@@ -352,8 +353,8 @@ public class Messager extends Service implements MqttSimpleCallback {
                 result.putString("name", profile.getString("name"));
                 profileId = profile.getString("id");
 
-                HttpGet togetclass =
-                    new HttpGet(
+                HttpPost togetclass =
+                    new HttpPost(
                             "http://"+ BACKEND_MODEL_HOSTNAME +"/register/"
                             + profileId);
 
@@ -398,8 +399,8 @@ public class Messager extends Service implements MqttSimpleCallback {
                 // Here we may need to do another sendMsg so that the others know
                 // the current Psession? This is to support multiple Psessions
                 try {
-                    HttpGet toget =
-                        new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/psession/start/"
+                    HttpPost toget =
+                        new HttpPost("http://"+ BACKEND_MODEL_HOSTNAME +"/psession/start/"
                                 + profileId);
                     HttpResponse resp = httpClient.execute(toget);
                     String respString = EntityUtils.toString(resp.getEntity());
@@ -436,14 +437,14 @@ public class Messager extends Service implements MqttSimpleCallback {
                 // Send the record to the server to keep
                 // This for the flower to show? and statistics
                 try {
-                    Log.i("participate http", "attempting");
-                    HttpGet toget =
-                        new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/psession/stop/"
+                    Log.i("participate", "attempting");
+                    HttpPost topost =
+                        new HttpPost("http://"+ BACKEND_MODEL_HOSTNAME +"/psession/stop/"
                                 + profileId);
-                    HttpResponse resp = httpClient.execute(toget);
-                    Log.i("participate http", EntityUtils.toString(resp.getEntity()));
+                    HttpResponse resp = httpClient.execute(topost);
+                    Log.i("participate", EntityUtils.toString(resp.getEntity()));
                 } catch (Exception e) {
-                    Log.e("participate http", e.getMessage());
+                    Log.e("participate", e.getMessage());
                 }
             }
         });
@@ -468,8 +469,8 @@ public class Messager extends Service implements MqttSimpleCallback {
                 try {
                     Log.i("participate", "attempting " + "http://"+ BACKEND_MODEL_HOSTNAME +"/rate/"
                                 + profileId + "/" + psId);
-                    HttpGet toget =
-                        new HttpGet("http://"+ BACKEND_MODEL_HOSTNAME +"/rate/"
+                    HttpPost toget =
+                        new HttpPost("http://"+ BACKEND_MODEL_HOSTNAME +"/rate/"
                                 + profileId + "/" + psId);
                     HttpResponse resp = httpClient.execute(toget);
                     Log.i("participate", EntityUtils.toString(resp.getEntity()));
