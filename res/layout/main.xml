@@ -28,4 +28,6 @@
 	<Button android:layout_height="wrap_content"
 		android:layout_width="fill_parent" android:id="@+id/togglePsessionButton"
 		android:text="Start" android:visibility="invisible"></Button>
+  	<ImageView android:id="@+id/rateImg" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  	android:visibility="invisible"></ImageView>
 </LinearLayout>

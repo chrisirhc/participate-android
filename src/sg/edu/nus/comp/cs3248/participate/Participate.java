@@ -23,6 +23,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,6 +38,7 @@ public class Participate extends Activity {
     private TextView textbox;
     private SharedPreferences prefs;
     private SharedPreferences.Editor prefsedit;
+    private ImageView ratingImg;
 
     Vibrator systemVibrator;
 
@@ -53,6 +55,7 @@ public class Participate extends Activity {
         prefs =
                 getSharedPreferences(getString(R.string.app_name), MODE_PRIVATE);
         prefsedit = prefs.edit();
+        ratingImg = (ImageView) findViewById(R.id.rateImg);
 
         findViewById(R.id.togglePsessionButton).setOnClickListener(
                 new View.OnClickListener() {
@@ -208,6 +211,8 @@ public class Participate extends Activity {
             if (b.getString("action").equals(Messager.ACTION_START)) {
                 // TODO
                 textbox.setText(b.getString("name") + " has started speaking");
+                rateCurrent(ratedCurrent, false);
+                ratingImg.setVisibility(View.VISIBLE);
             } else if (b.getString("action").equals(Messager.ACTION_STOP)) {
                 // TODO send rating or start counting down
                 textbox.setText(b.getString("name") + " has stopped speaking");
@@ -215,6 +220,7 @@ public class Participate extends Activity {
                     mBoundService.ratePsession(b.getString("psessionId"));
                     ratedCurrent = false;
                 }
+                ratingImg.setVisibility(View.INVISIBLE);
             } else if (b.getString("action").equals(Messager.ACTION_PIND)) {
                 // TODO
             }
@@ -305,14 +311,21 @@ public class Participate extends Activity {
     
     private boolean ratedCurrent = false;
     private void rateCurrent(boolean rc) {
-        if (ratedCurrent != rc) {
+        rateCurrent(rc, ratedCurrent != rc);
+    }
+    private void rateCurrent(boolean rc, boolean notify) {
+        if (notify)
             systemVibrator.vibrate(QUICKVIBRATE);
-            ratedCurrent = rc;
-            if(rc)
-                textbox.setText("starred!");
-            else
-                textbox.setText("nostarred!");
-        }
+        ratedCurrent = rc;
+        if(rc) {
+            ratingImg.setImageResource(R.drawable.rated);
+            if (notify)
+                Toast.makeText(Participate.this, "Rated! :)", Toast.LENGTH_SHORT).show();
+        } else {
+            ratingImg.setImageResource(R.drawable.unrated);
+            if (notify)
+                Toast.makeText(Participate.this, "Unrated", Toast.LENGTH_SHORT).show();
+            }
         // vibrate when this is changed
     }
 }
