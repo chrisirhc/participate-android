@@ -10,6 +10,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -23,6 +24,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -34,9 +36,11 @@ public class Participate extends Activity {
     public static final String ACTION_PSESSION =
             "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION";
 
-    private TextView textbox;
+    private TextView textbox, actionbox;
     private SharedPreferences prefs;
     private SharedPreferences.Editor prefsedit;
+    private ImageView ratingImg;
+    private Button togglePsessionButton;
 
     Vibrator systemVibrator;
 
@@ -50,9 +54,12 @@ public class Participate extends Activity {
 
         systemVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         textbox = (TextView) findViewById(R.id.textbox);
+        actionbox = (TextView) findViewById(R.id.actionbox);
+        togglePsessionButton = ((Button) findViewById(R.id.togglePsessionButton));
         prefs =
                 getSharedPreferences(getString(R.string.app_name), MODE_PRIVATE);
         prefsedit = prefs.edit();
+        ratingImg = (ImageView) findViewById(R.id.rateImg);
 
         findViewById(R.id.togglePsessionButton).setOnClickListener(
                 new View.OnClickListener() {
@@ -207,14 +214,24 @@ public class Participate extends Activity {
              */
             if (b.getString("action").equals(Messager.ACTION_START)) {
                 // TODO
-                textbox.setText(b.getString("name") + " has started speaking");
+                textbox.setText(b.getString("name"));
+                actionbox.setText("Speaking now...");
+                actionbox.setTextColor(Color.rgb(0xee, 0xee, 0xee));
+                rateCurrent(ratedCurrent, false);
+                togglePsessionButton.setEnabled(false);
+                togglePsessionButton.setText("Someone is speaking");
+                ratingImg.setVisibility(View.VISIBLE);
             } else if (b.getString("action").equals(Messager.ACTION_STOP)) {
-                // TODO send rating or start counting down
-                textbox.setText(b.getString("name") + " has stopped speaking");
                 if (ratedCurrent) {
                     mBoundService.ratePsession(b.getString("psessionId"));
                     ratedCurrent = false;
                 }
+                textbox.setText(b.getString("name"));
+                actionbox.setText("Just spoken...");
+                actionbox.setTextColor(Color.rgb(0xcc, 0xcc, 0xcc));
+                togglePsessionButton.setEnabled(true);
+                togglePsessionButton.setText("Start");
+                ratingImg.setVisibility(View.INVISIBLE);
             } else if (b.getString("action").equals(Messager.ACTION_PIND)) {
                 // TODO
             }
@@ -232,11 +249,11 @@ public class Participate extends Activity {
     private void togglePsession() {
         if (!psessionOngoing) {
             mBoundService.startPsession();
-            ((Button) findViewById(R.id.togglePsessionButton)).setText("Stop");
+            togglePsessionButton.setText("Stop");
         } else {
             // Stop the session
             mBoundService.stopPsession();
-            ((Button) findViewById(R.id.togglePsessionButton)).setText("Start");
+            togglePsessionButton.setText("Start");
         }
         psessionOngoing = !psessionOngoing;
         systemVibrator.vibrate(QUICKVIBRATE);
@@ -276,7 +293,8 @@ public class Participate extends Activity {
             userId_box.setText(regInfo.getString("name"));
             classTitle_box.setText(regInfo.getString("classTitle"));
             // Following line is unnecessary
-            findViewById(R.id.togglePsessionButton).setVisibility(View.VISIBLE);
+            togglePsessionButton.setVisibility(View.VISIBLE);
+            togglePsessionButton.setText("Start");
             dismissDialog(REGISTER_PROGRESS);
         }
     };
@@ -305,14 +323,21 @@ public class Participate extends Activity {
     
     private boolean ratedCurrent = false;
     private void rateCurrent(boolean rc) {
-        if (ratedCurrent != rc) {
+        rateCurrent(rc, ratedCurrent != rc);
+    }
+    private void rateCurrent(boolean rc, boolean notify) {
+        if (notify)
             systemVibrator.vibrate(QUICKVIBRATE);
-            ratedCurrent = rc;
-            if(rc)
-                textbox.setText("starred!");
-            else
-                textbox.setText("nostarred!");
-        }
+        ratedCurrent = rc;
+        if(rc) {
+            ratingImg.setImageResource(R.drawable.rated);
+            if (notify)
+                Toast.makeText(Participate.this, "Rated! :)", Toast.LENGTH_SHORT).show();
+        } else {
+            ratingImg.setImageResource(R.drawable.unrated);
+            if (notify)
+                Toast.makeText(Participate.this, "Unrated", Toast.LENGTH_SHORT).show();
+            }
         // vibrate when this is changed
     }
 }

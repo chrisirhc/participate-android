@@ -2,30 +2,36 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	android:orientation="vertical" android:layout_width="fill_parent"
 	android:layout_height="fill_parent">
-	<!-- Current message -->
-	<TextView android:layout_width="fill_parent"
-		android:layout_height="wrap_content" android:text="@string/hello"
+	<!-- Currently Speaking -->
+	<TextView android:layout_width="wrap_content" 
+		android:layout_height="wrap_content" android:text="Nobody has spoken"
+		android:id="@+id/actionbox" android:textColor="#999" />
+	<TextView android:layout_width="wrap_content" android:layout_gravity="center"
+		android:layout_height="wrap_content" android:hint="-"
 		android:id="@+id/textbox" android:textSize="30dip" />
 
 	<!-- Who is the current user? -->
 	<TextView android:layout_width="wrap_content"
-		android:layout_height="wrap_content" android:text="You are:"
+		android:layout_height="wrap_content" android:text="You are"
 		android:textColor="#999"></TextView>
 	<TextView android:hint="-" android:layout_width="wrap_content"
 		android:layout_height="wrap_content" android:id="@+id/userId"
-		android:layout_gravity="center" android:textColor="#fff"
-		android:textSize="30dip"></TextView>
+		android:layout_gravity="center" android:textColor="#eee"
+		android:textSize="20dip"></TextView>
 
 	<!--  Note the current class -->
 	<TextView android:layout_width="wrap_content"
-		android:layout_height="wrap_content" android:text="You are currently in:"
+		android:layout_height="wrap_content" android:text="You are currently in"
 		android:textColor="#999"></TextView>
-	<TextView android:hint="-" android:textSize="30dip" android:textColor="#fff"
+	<TextView android:hint="-" android:textSize="30dip" android:textColor="#eee"
 		android:layout_gravity="center" android:layout_width="wrap_content"
 		android:layout_height="wrap_content" android:id="@+id/classTitle"></TextView>
 
 	<!--  Toggle the current user's participation session -->
 	<Button android:layout_height="wrap_content"
 		android:layout_width="fill_parent" android:id="@+id/togglePsessionButton"
-		android:text="Start" android:visibility="invisible"></Button>
+		android:text="-" android:visibility="invisible"
+		android:textSize="25dip"></Button>
+  	<ImageView android:id="@+id/rateImg" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  	android:visibility="invisible"></ImageView>
 </LinearLayout>
