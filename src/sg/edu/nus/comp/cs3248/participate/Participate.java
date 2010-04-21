@@ -10,35 +10,32 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Vibrator;
 import android.text.InputType;
 import android.util.Log;
-import android.view.KeyEvent;
+import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.Button;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.SlidingDrawer;
 import android.widget.TextView;
 import android.widget.Toast;
-
-/* TODO
- * - Should be  
- */
 
 public class Participate extends Activity {
     public static final String ACTION_PSESSION =
             "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION";
 
-    private TextView textbox;
     private SharedPreferences prefs;
     private SharedPreferences.Editor prefsedit;
     private ImageView ratingImg;
@@ -47,6 +44,8 @@ public class Participate extends Activity {
     private TextView theDrawerText, theDrawerBack;
     private FrameLayout theDrawerFrame, theDrawerBackFrame;
     private ImageView theDrawerHandle;
+    
+    private TextView theBubble;
 
     Vibrator systemVibrator;
 
@@ -59,8 +58,8 @@ public class Participate extends Activity {
         setContentView(R.layout.main);
 
         systemVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-        textbox = (TextView) findViewById(R.id.textbox);
 
+        theBubble = (TextView) findViewById(R.id.theBubble);
         theDrawer = (SlidingDrawer) findViewById(R.id.theDrawer);
         theDrawerBack = (TextView) findViewById(R.id.theDrawerBack);
         theDrawerText = (TextView) findViewById(R.id.theDrawerText);
@@ -79,19 +78,45 @@ public class Participate extends Activity {
         theDrawer.setOnDrawerOpenListener(new SlidingDrawer.OnDrawerOpenListener() {
             @Override
             public void onDrawerOpened() {
+                // haptic
+                theDrawer.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 green();
             }
         });
         theDrawer.setOnDrawerCloseListener(new SlidingDrawer.OnDrawerCloseListener() {
             @Override
             public void onDrawerClosed() {
+                // haptic
+                theDrawer.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 red();
             }
         });
-
+        
+        theDrawer.setOnDrawerScrollListener(new SlidingDrawer.OnDrawerScrollListener() {
+            @Override
+            public void onScrollStarted() {
+                // haptic
+                theDrawer.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                Animation fade = AnimationUtils.loadAnimation(Participate.this, R.anim.fade);
+                if (theDrawer.isOpened()) {
+                    findViewById(R.id.greenOutline).startAnimation(fade);
+                    findViewById(R.id.greenOutline).setVisibility(View.VISIBLE);
+                } else {
+                    findViewById(R.id.redOutline).startAnimation(fade);
+                    findViewById(R.id.redOutline).setVisibility(View.VISIBLE);
+                }
+            }
+            
+            @Override
+            public void onScrollEnded() {
+                // TODO Auto-generated method stub
+                findViewById(R.id.greenOutline).setVisibility(View.INVISIBLE);
+                findViewById(R.id.redOutline).setVisibility(View.INVISIBLE);
+            }
+        });
+        
         // put this in a thread?
         new Thread(new Runnable() {
-
             @Override
             public void run() {
                 bindService(new Intent(Participate.this, Messager.class),
@@ -143,7 +168,6 @@ public class Participate extends Activity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         menu.add(Menu.NONE, MENU_REGISTER, Menu.NONE, "Register");
-        // getMenuInflater().inflate(R.menu.logviewer, menu);
         return true;
     }
 
@@ -188,21 +212,14 @@ public class Participate extends Activity {
         return false;
     }
 
-    @Override
-    public boolean onKeyUp(int keyCode, KeyEvent event) {
-        switch (keyCode) {
-        case KeyEvent.KEYCODE_DPAD_CENTER:
-            // togglePsession();
-            return true;
-        }
-        return false;
-    }
-    
     final static float STROKETHRESHOLD = 100;
     float lastY = 0;
     // To implement the rating system
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        // only use these when it's grey
+        if (currState != Participate.State.GREY)
+            return super.onTouchEvent(event);
         // TODO Auto-generated method stub
         switch(event.getAction()) {
         case MotionEvent.ACTION_DOWN:
@@ -216,11 +233,16 @@ public class Participate extends Activity {
                 rateCurrent(true);
                 return true;
             }
-            Log.d("participate", "event history size:" + Float.toString(event.getY()));
             break;
         }
         return super.onTouchEvent(event);
     }
+    
+    /* TODO
+     * This means there is only support for one psession at a time.
+     * We only keep track of the last user that has pressed start.
+     */
+    private Bundle psessionBundle = new Bundle();
 
     @Override
     protected void onNewIntent(Intent intent) {
@@ -229,6 +251,7 @@ public class Participate extends Activity {
 
             Log.d("bundle", "here");
             Bundle b = intent.getBundleExtra(Participate.ACTION_PSESSION);
+            psessionBundle.putString("name", b.getString("name"));
             /*
              * TODO Possibly remove the coupling by moving all the constants to
              * Participate class.
@@ -305,6 +328,7 @@ public class Participate extends Activity {
     final Runnable updateUiText = new Runnable() {
         @Override
         public void run() {
+            // Set the title to show the user and class
             setTitle(getString(R.string.app_name) + " (" + regInfo.getString("name") 
                     + " @ " + regInfo.getString("classTitle") + ")");
 
@@ -314,8 +338,6 @@ public class Participate extends Activity {
             // Green //
             green();
 
-            // TODO Friendly messages. Adjust later.
-            // Following line is unnecessary
             dismissDialog(REGISTER_PROGRESS);
         }
     };
@@ -333,7 +355,7 @@ public class Participate extends Activity {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                regInfo =
+                regInfo = 
                         mBoundService.registerUser(prefs.getString("userId",
                                 "0"));
                 mHandler.post(updateUiText);
@@ -350,13 +372,14 @@ public class Participate extends Activity {
             systemVibrator.vibrate(QUICKVIBRATE);
         ratedCurrent = rc;
         if(rc) {
-            ratingImg.setImageResource(R.drawable.rated);
+            ratingImg.setImageResource(R.drawable.flowerexcel);
             if (notify)
-                Toast.makeText(Participate.this, "Rated! :)", Toast.LENGTH_SHORT).show();
+                Toast.makeText(Participate.this, "You are applauding " + psessionBundle.getString("name") + "! :)", 
+                        Toast.LENGTH_SHORT).show();
         } else {
-            ratingImg.setImageResource(R.drawable.unrated);
+            ratingImg.setImageResource(R.drawable.flowergood);
             if (notify)
-                Toast.makeText(Participate.this, "Unrated", Toast.LENGTH_SHORT).show();
+                Toast.makeText(Participate.this, "No more applaud for " + psessionBundle.getString("name"), Toast.LENGTH_SHORT).show();
             }
         // vibrate when this is changed
     }
@@ -375,23 +398,35 @@ public class Participate extends Activity {
             theDrawerText.setText("");
         }
     }
-
+    
+    public static enum State {GREEN, RED, GREY};
+    private State currState;
+    
     /**
      * Ready for a new psession to occur
      * assume that {@code theDrawer} is opened
      */
     private void green() {
+        currState = Participate.State.GREEN;
         // show a friendly participate
-        drawerMsg("Swipe right to participate");
+        theBubble.setBackgroundResource(R.drawable.speechbubble);
+        theBubble.setText("Pull me right to participate >");
+        Animation fade = AnimationUtils.loadAnimation(Participate.this, R.anim.fade);
+        theBubble.startAnimation(fade);
+        theBubble.setVisibility(View.VISIBLE);
+        ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).gravity = Gravity.LEFT;
+        ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).setMargins(
+                getResources().getDimensionPixelOffset(R.dimen.handleWidth) / 2, 0, 0, 0);
         // enable the drawer
         theDrawer.unlock();
 
         // set to green ball
-        theDrawerHandle.setBackgroundColor(Color.GREEN);
+        theDrawerHandle.setImageResource(R.drawable.greenpac);
         // handle ratings?
 
         if (psessionOngoing) {
             psessionOngoing = false;
+            Toast.makeText(Participate.this, "Thank you for participating!", Toast.LENGTH_SHORT).show();
             mBoundService.stopPsession();
         }
     }
@@ -401,10 +436,18 @@ public class Participate extends Activity {
      * assume that {@code theDrawer} is closed
      */
     private void red() {
+        currState = Participate.State.RED;
         // currently in a session
-        drawerMsg("Swipe left to indicate end of participation");
+        theBubble.setBackgroundResource(R.drawable.speechbubbler);
+        theBubble.setText("< Pull me back left when you are done");
+        Animation fade = AnimationUtils.loadAnimation(Participate.this, R.anim.fade);
+        theBubble.startAnimation(fade);
+        theBubble.setVisibility(View.VISIBLE);
+        ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).gravity = Gravity.RIGHT;
+        ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).setMargins(
+                0, 0, getResources().getDimensionPixelOffset(R.dimen.handleWidth) / 2, 0);
         // set to red ball
-        theDrawerHandle.setBackgroundColor(Color.RED);
+        theDrawerHandle.setImageResource(R.drawable.redpac);
 
         psessionOngoing = true;
         mBoundService.startPsession();
@@ -415,10 +458,20 @@ public class Participate extends Activity {
      * assume that {@code theDrawer} is opened
      */
     private void grey(String name) {
-        drawerMsg(name + " is speaking..");
-        theDrawerHandle.setBackgroundColor(Color.GRAY);
+        currState = Participate.State.GREY;
+        theBubble.setBackgroundResource(R.drawable.speechbubbler);
+        theBubble.setText(name + " is speaking..");
+        Animation fade = AnimationUtils.loadAnimation(Participate.this, R.anim.fade);
+        theBubble.startAnimation(fade);
+        theBubble.setVisibility(View.VISIBLE);
+        ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).gravity = Gravity.RIGHT;
+        ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).setMargins(
+                0, 0, getResources().getDimensionPixelOffset(R.dimen.handleWidth) / 2, 0);
+
+        theDrawerHandle.setImageResource(R.drawable.orangepac);
         // TODO check whether this works
         theDrawer.lock();
         // set the whole area to grey
+        systemVibrator.vibrate(QUICKVIBRATE);
     }
 }

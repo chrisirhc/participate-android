@@ -2,46 +2,56 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	android:orientation="vertical" android:layout_width="fill_parent"
 	android:layout_height="fill_parent">
-	<!-- Currently Speaking -->
-	<TextView android:layout_width="wrap_content" android:layout_gravity="center"
-		android:layout_height="wrap_content" android:hint="-"
-		android:id="@+id/textbox" android:textSize="30dip" />
 
-	<!--  Rating -->
-  	<ImageView android:id="@+id/rateImg" android:layout_width="wrap_content" android:layout_height="wrap_content"
-  	android:visibility="invisible"></ImageView>
-  	
-  	<!--  the drawer -->
-<FrameLayout
+	<FrameLayout
 	android:id="@+id/theDrawerBackFrame"
     android:layout_width="fill_parent"
-    android:layout_height="60dip"
+    android:layout_height="@dimen/handleHeight"
     android:layout_gravity="bottom"
-    android:layout_marginBottom="30dip"
-    android:layout_marginRight="60dip"
-    android:background="@drawable/arrow"
+    android:layout_marginBottom="@dimen/myMarginBottom"
+    android:layout_marginRight="@dimen/handleWidth"
     >
 	<TextView android:layout_width="wrap_content" 
-		android:layout_height="wrap_content" android:layout_gravity="center"
+		android:layout_height="wrap_content" android:layout_gravity="center"  android:gravity="center"
 		android:id="@+id/theDrawerBack"/>
-</FrameLayout>
-   <SlidingDrawer
+	</FrameLayout>
+	
+	<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content"
+	android:gravity="bottom" android:layout_gravity="bottom">
+		<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content"
+		android:gravity="bottom" android:layout_gravity="bottom">
+			<!--  Rating -->
+		  	<ImageView android:id="@+id/rateImg" android:layout_width="wrap_content" android:layout_height="wrap_content"
+			  	android:visibility="invisible"></ImageView>
+	  	</LinearLayout>
+  	
+  	<!--  Speech bubble -->
+    <TextView
+         android:id="@+id/theBubble"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+         android:gravity="center"
+         android:textSize="20dp"
+         android:textColor="#333"
+         android:background="@drawable/speechbubble" android:visibility="invisible" />
+  	
+   	<SlidingDrawer
      android:id="@+id/theDrawer"
      android:layout_width="fill_parent"
-     android:layout_height="60dip"
+     android:layout_height="@dimen/handleHeight"
      android:orientation="horizontal"
      android:allowSingleTap="false"
 
      android:handle="@+id/theDrawerHandle"
      android:content="@+id/theDrawerContent"
-     android:layout_gravity="bottom"
-     android:layout_marginBottom="30dip"
+     android:layout_gravity="center_horizontal|bottom"
+     android:layout_marginBottom="@dimen/myMarginBottom"
      >
 
      <ImageView
          android:id="@id/theDrawerHandle"
-         android:layout_width="60dip"
-         android:layout_height="60dip" android:src="@drawable/drawer"
+         android:layout_width="@dimen/handleWidth"
+         android:layout_height="@dimen/handleHeight"
          />
 
 	<FrameLayout
@@ -52,7 +62,24 @@
      <TextView
          android:id="@+id/theDrawerText"
          android:layout_width="wrap_content"
-         android:layout_height="wrap_content" android:layout_gravity="center"/>
+         android:layout_height="wrap_content" android:layout_gravity="center"
+         android:gravity="center"/>
 	</FrameLayout>
- </SlidingDrawer> 
+	 </SlidingDrawer> 
+	</LinearLayout>
+  	<!--  green / red pac outlines -->
+  	<ImageView android:id="@+id/greenOutline"
+  	android:src="@drawable/greenpacout"
+    android:layout_gravity="bottom|right"
+  	android:layout_marginBottom="@dimen/myMarginBottom"
+    android:layout_width="@dimen/handleWidth" android:layout_height="@dimen/handleHeight"
+  	android:visibility="invisible"></ImageView>
+
+  	<ImageView android:id="@+id/redOutline"
+  	android:src="@drawable/redpacout"
+    android:layout_gravity="bottom"
+  	android:layout_marginBottom="@dimen/myMarginBottom"
+    android:layout_width="@dimen/handleWidth" android:layout_height="@dimen/handleHeight"
+  	android:visibility="invisible"></ImageView>
+  	<!--  the drawer -->
 </FrameLayout> 

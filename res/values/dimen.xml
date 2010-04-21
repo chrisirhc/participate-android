@@ -1,0 +1,5 @@
+<resources>
+<dimen name="myMarginBottom">60dp</dimen>
+<dimen name="handleWidth">80dp</dimen>
+<dimen name="handleHeight">80dp</dimen>
+</resources>
