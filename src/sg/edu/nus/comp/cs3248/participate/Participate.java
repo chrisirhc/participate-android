@@ -24,7 +24,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.SlidingDrawer;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -36,11 +38,15 @@ public class Participate extends Activity {
     public static final String ACTION_PSESSION =
             "sg.edu.nus.comp.cs3248.particpate.ACTION_PSESSION";
 
-    private TextView textbox, actionbox;
+    private TextView textbox;
     private SharedPreferences prefs;
     private SharedPreferences.Editor prefsedit;
     private ImageView ratingImg;
-    private Button togglePsessionButton;
+
+    private SlidingDrawer theDrawer;
+    private TextView theDrawerText, theDrawerBack;
+    private FrameLayout theDrawerFrame, theDrawerBackFrame;
+    private ImageView theDrawerHandle;
 
     Vibrator systemVibrator;
 
@@ -54,20 +60,34 @@ public class Participate extends Activity {
 
         systemVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         textbox = (TextView) findViewById(R.id.textbox);
-        actionbox = (TextView) findViewById(R.id.actionbox);
-        togglePsessionButton = ((Button) findViewById(R.id.togglePsessionButton));
+
+        theDrawer = (SlidingDrawer) findViewById(R.id.theDrawer);
+        theDrawerBack = (TextView) findViewById(R.id.theDrawerBack);
+        theDrawerText = (TextView) findViewById(R.id.theDrawerText);
+        theDrawerHandle = (ImageView) findViewById(R.id.theDrawerHandle);
+        theDrawerFrame = (FrameLayout) findViewById(R.id.theDrawerContent);
+
         prefs =
                 getSharedPreferences(getString(R.string.app_name), MODE_PRIVATE);
         prefsedit = prefs.edit();
         ratingImg = (ImageView) findViewById(R.id.rateImg);
+        
+        // set listeners only after it is opened
+        theDrawer.open();
 
-        findViewById(R.id.togglePsessionButton).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        togglePsession();
-                    }
-                });
+        // what happens when you open/close the drawer
+        theDrawer.setOnDrawerOpenListener(new SlidingDrawer.OnDrawerOpenListener() {
+            @Override
+            public void onDrawerOpened() {
+                green();
+            }
+        });
+        theDrawer.setOnDrawerCloseListener(new SlidingDrawer.OnDrawerCloseListener() {
+            @Override
+            public void onDrawerClosed() {
+                red();
+            }
+        });
 
         // put this in a thread?
         new Thread(new Runnable() {
@@ -82,8 +102,9 @@ public class Participate extends Activity {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
+        green();
         unbindService(mConnection);
+        super.onDestroy();
     }
 
     private Messager mBoundService;
@@ -171,7 +192,7 @@ public class Participate extends Activity {
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         switch (keyCode) {
         case KeyEvent.KEYCODE_DPAD_CENTER:
-            togglePsession();
+            // togglePsession();
             return true;
         }
         return false;
@@ -214,28 +235,20 @@ public class Participate extends Activity {
              */
             if (b.getString("action").equals(Messager.ACTION_START)) {
                 // TODO
-                textbox.setText(b.getString("name"));
-                actionbox.setText("Speaking now...");
-                actionbox.setTextColor(Color.rgb(0xee, 0xee, 0xee));
+                // someone is speaking
+                grey(b.getString("name"));
                 rateCurrent(ratedCurrent, false);
-                togglePsessionButton.setEnabled(false);
-                togglePsessionButton.setText("Someone is speaking");
                 ratingImg.setVisibility(View.VISIBLE);
             } else if (b.getString("action").equals(Messager.ACTION_STOP)) {
+                // someone has stopped speaking
                 if (ratedCurrent) {
                     mBoundService.ratePsession(b.getString("psessionId"));
                     ratedCurrent = false;
                 }
-                textbox.setText(b.getString("name"));
-                actionbox.setText("Just spoken...");
-                actionbox.setTextColor(Color.rgb(0xcc, 0xcc, 0xcc));
-                togglePsessionButton.setEnabled(true);
-                togglePsessionButton.setText("Start");
                 ratingImg.setVisibility(View.INVISIBLE);
-            } else if (b.getString("action").equals(Messager.ACTION_PIND)) {
-                // TODO
+                green();
             }
-            Log.d("bundle", b.getString("action"));
+            Log.d("participate", "bundle received:" + b.getString("action"));
         }
     }
 
@@ -246,14 +259,20 @@ public class Participate extends Activity {
     
     final static long QUICKVIBRATE = 100;
 
+    /**
+     * Used for trackball interaction
+     * @deprecated
+     * @see Participate#green()
+     */
     private void togglePsession() {
         if (!psessionOngoing) {
             mBoundService.startPsession();
-            togglePsessionButton.setText("Stop");
+            // Remember, close it when the session has started
+            
         } else {
             // Stop the session
             mBoundService.stopPsession();
-            togglePsessionButton.setText("Start");
+            // Remember, open it when the session has stopped
         }
         psessionOngoing = !psessionOngoing;
         systemVibrator.vibrate(QUICKVIBRATE);
@@ -286,29 +305,30 @@ public class Participate extends Activity {
     final Runnable updateUiText = new Runnable() {
         @Override
         public void run() {
-            TextView userId_box = (TextView) findViewById(R.id.userId);
-            TextView classTitle_box = (TextView) findViewById(R.id.classTitle);
+            setTitle(getString(R.string.app_name) + " (" + regInfo.getString("name") 
+                    + " @ " + regInfo.getString("classTitle") + ")");
+
+            /* TODO get the people who are currently in the middle of a psession. 
+             * It's unable to do that now (always green)
+             */
+            // Green //
+            green();
 
             // TODO Friendly messages. Adjust later.
-            userId_box.setText(regInfo.getString("name"));
-            classTitle_box.setText(regInfo.getString("classTitle"));
             // Following line is unnecessary
-            togglePsessionButton.setVisibility(View.VISIBLE);
-            togglePsessionButton.setText("Start");
             dismissDialog(REGISTER_PROGRESS);
         }
     };
-
+    
     /**
      * Tell Messager to register the user also updates the text fields and the
      * registration information
      */
     protected void registerUser() {
         showDialog(REGISTER_PROGRESS);
-        // These are actually unnecessary but oh well
-        ((TextView) findViewById(R.id.userId)).setText("");
-        ((TextView) findViewById(R.id.classTitle)).setText("");
-        findViewById(R.id.togglePsessionButton).setVisibility(View.INVISIBLE);
+        // set the title in case of halfway cancellation?
+        setTitle(R.string.app_name);
+
         // Changing the views.
         new Thread(new Runnable() {
             @Override
@@ -339,5 +359,66 @@ public class Participate extends Activity {
                 Toast.makeText(Participate.this, "Unrated", Toast.LENGTH_SHORT).show();
             }
         // vibrate when this is changed
+    }
+    
+    /**
+     * Helper to write strings beside {@code theDrawer} on the bottom
+     * Strings should pertain to the psession information
+     * @param s Given string.
+     */
+    private void drawerMsg(String s) {
+        if(theDrawer.isOpened()) {
+            theDrawerText.setText(s);
+            theDrawerBack.setText("");
+        } else {
+            theDrawerBack.setText(s);
+            theDrawerText.setText("");
+        }
+    }
+
+    /**
+     * Ready for a new psession to occur
+     * assume that {@code theDrawer} is opened
+     */
+    private void green() {
+        // show a friendly participate
+        drawerMsg("Swipe right to participate");
+        // enable the drawer
+        theDrawer.unlock();
+
+        // set to green ball
+        theDrawerHandle.setBackgroundColor(Color.GREEN);
+        // handle ratings?
+
+        if (psessionOngoing) {
+            psessionOngoing = false;
+            mBoundService.stopPsession();
+        }
+    }
+
+    /**
+     * Currently in a psession. Can signal red to stop.
+     * assume that {@code theDrawer} is closed
+     */
+    private void red() {
+        // currently in a session
+        drawerMsg("Swipe left to indicate end of participation");
+        // set to red ball
+        theDrawerHandle.setBackgroundColor(Color.RED);
+
+        psessionOngoing = true;
+        mBoundService.startPsession();
+    }
+
+    /**
+     * Someone is currently speaking
+     * assume that {@code theDrawer} is opened
+     */
+    private void grey(String name) {
+        drawerMsg(name + " is speaking..");
+        theDrawerHandle.setBackgroundColor(Color.GRAY);
+        // TODO check whether this works
+        theDrawer.lock();
+        // set the whole area to grey
     }
 }
