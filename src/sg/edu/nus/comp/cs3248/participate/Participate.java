@@ -28,6 +28,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.SlidingDrawer;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -44,6 +45,7 @@ public class Participate extends Activity {
     private TextView theDrawerText, theDrawerBack;
     private FrameLayout theDrawerFrame, theDrawerBackFrame;
     private ImageView theDrawerHandle;
+    private ImageView orangePacman;
     
     private TextView theBubble;
 
@@ -65,11 +67,17 @@ public class Participate extends Activity {
         theDrawerText = (TextView) findViewById(R.id.theDrawerText);
         theDrawerHandle = (ImageView) findViewById(R.id.theDrawerHandle);
         theDrawerFrame = (FrameLayout) findViewById(R.id.theDrawerContent);
-
+        orangePacman = (ImageView) findViewById(R.id.orangePacman);
+        
         prefs =
                 getSharedPreferences(getString(R.string.app_name), MODE_PRIVATE);
         prefsedit = prefs.edit();
         ratingImg = (ImageView) findViewById(R.id.rateImg);
+
+        rateToast = Toast.makeText(Participate.this, "", 
+                            Toast.LENGTH_SHORT);
+        unrateToast = Toast.makeText(Participate.this, "", 
+                            Toast.LENGTH_SHORT);
         
         // set listeners only after it is opened
         theDrawer.open();
@@ -109,9 +117,22 @@ public class Participate extends Activity {
             
             @Override
             public void onScrollEnded() {
-                // TODO Auto-generated method stub
                 findViewById(R.id.greenOutline).setVisibility(View.INVISIBLE);
                 findViewById(R.id.redOutline).setVisibility(View.INVISIBLE);
+            }
+        });
+        
+        ((RadioGroup)findViewById(R.id.ratingRadio)).setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                switch(checkedId) {
+                case R.id.ratingExcellent:
+                    rateCurrent(true);
+                    break;
+                case R.id.ratingGood:
+                    rateCurrent(false);
+                    break;
+                }
             }
         });
         
@@ -220,17 +241,16 @@ public class Participate extends Activity {
         // only use these when it's grey
         if (currState != Participate.State.GREY)
             return super.onTouchEvent(event);
-        // TODO Auto-generated method stub
         switch(event.getAction()) {
         case MotionEvent.ACTION_DOWN:
             lastY = event.getY();
             break;
         case MotionEvent.ACTION_MOVE:
             if (event.getY() - lastY > STROKETHRESHOLD) {
-                rateCurrent(false);
+                ((RadioGroup)findViewById(R.id.ratingRadio)).check(R.id.ratingGood);
                 return true;
             } else if (event.getY() - lastY < -STROKETHRESHOLD) {
-                rateCurrent(true);
+                ((RadioGroup)findViewById(R.id.ratingRadio)).check(R.id.ratingExcellent);
                 return true;
             }
             break;
@@ -257,18 +277,17 @@ public class Participate extends Activity {
              * Participate class.
              */
             if (b.getString("action").equals(Messager.ACTION_START)) {
-                // TODO
                 // someone is speaking
                 grey(b.getString("name"));
+                rateToast.setText("You are applauding " + psessionBundle.getString("name") + "! :)");
+                unrateToast.setText("No more applaud for " + psessionBundle.getString("name"));
                 rateCurrent(ratedCurrent, false);
-                ratingImg.setVisibility(View.VISIBLE);
             } else if (b.getString("action").equals(Messager.ACTION_STOP)) {
                 // someone has stopped speaking
                 if (ratedCurrent) {
                     mBoundService.ratePsession(b.getString("psessionId"));
                     ratedCurrent = false;
                 }
-                ratingImg.setVisibility(View.INVISIBLE);
                 green();
             }
             Log.d("participate", "bundle received:" + b.getString("action"));
@@ -279,7 +298,7 @@ public class Participate extends Activity {
      * Toggle whether starting or stopping
      */
     protected static boolean psessionOngoing = false;
-    
+
     final static long QUICKVIBRATE = 100;
 
     /**
@@ -341,7 +360,7 @@ public class Participate extends Activity {
             dismissDialog(REGISTER_PROGRESS);
         }
     };
-    
+
     /**
      * Tell Messager to register the user also updates the text fields and the
      * registration information
@@ -364,6 +383,8 @@ public class Participate extends Activity {
     }
     
     private boolean ratedCurrent = false;
+    Toast rateToast;
+    Toast unrateToast;
     private void rateCurrent(boolean rc) {
         rateCurrent(rc, ratedCurrent != rc);
     }
@@ -373,17 +394,22 @@ public class Participate extends Activity {
         ratedCurrent = rc;
         if(rc) {
             ratingImg.setImageResource(R.drawable.flowerexcel);
-            if (notify)
-                Toast.makeText(Participate.this, "You are applauding " + psessionBundle.getString("name") + "! :)", 
-                        Toast.LENGTH_SHORT).show();
+            ((LinearLayout.LayoutParams) ratingImg.getLayoutParams()).weight = 1.0f;
+            if (notify) {
+                rateToast.show();
+                unrateToast.cancel();
+            }
+            Log.d("participate", "testtest radio");
         } else {
             ratingImg.setImageResource(R.drawable.flowergood);
-            if (notify)
-                Toast.makeText(Participate.this, "No more applaud for " + psessionBundle.getString("name"), Toast.LENGTH_SHORT).show();
+            ((LinearLayout.LayoutParams) ratingImg.getLayoutParams()).weight = 0.6f;
+            if (notify) {
+                rateToast.cancel();
+                unrateToast.show();
             }
-        // vibrate when this is changed
+        }
     }
-    
+
     /**
      * Helper to write strings beside {@code theDrawer} on the bottom
      * Strings should pertain to the psession information
@@ -408,7 +434,9 @@ public class Participate extends Activity {
      */
     private void green() {
         currState = Participate.State.GREEN;
-        // show a friendly participate
+        // enable the drawer
+        theDrawer.unlock();
+
         theBubble.setBackgroundResource(R.drawable.speechbubble);
         theBubble.setText("Pull me right to participate >");
         Animation fade = AnimationUtils.loadAnimation(Participate.this, R.anim.fade);
@@ -417,13 +445,15 @@ public class Participate extends Activity {
         ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).gravity = Gravity.LEFT;
         ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).setMargins(
                 getResources().getDimensionPixelOffset(R.dimen.handleWidth) / 2, 0, 0, 0);
-        // enable the drawer
-        theDrawer.unlock();
 
         // set to green ball
         theDrawerHandle.setImageResource(R.drawable.greenpac);
-        // handle ratings?
+        // disable ratings (no one is speaking)
+        findViewById(R.id.ratingFrame).setVisibility(View.INVISIBLE);
+        orangePacman.setVisibility(View.INVISIBLE);
+        theDrawer.setVisibility(View.VISIBLE);
 
+        // handle ratings?
         if (psessionOngoing) {
             psessionOngoing = false;
             Toast.makeText(Participate.this, "Thank you for participating!", Toast.LENGTH_SHORT).show();
@@ -448,6 +478,7 @@ public class Participate extends Activity {
                 0, 0, getResources().getDimensionPixelOffset(R.dimen.handleWidth) / 2, 0);
         // set to red ball
         theDrawerHandle.setImageResource(R.drawable.redpac);
+        theDrawer.setVisibility(View.VISIBLE);
 
         psessionOngoing = true;
         mBoundService.startPsession();
@@ -459,18 +490,21 @@ public class Participate extends Activity {
      */
     private void grey(String name) {
         currState = Participate.State.GREY;
+        theDrawer.lock();
+
         theBubble.setBackgroundResource(R.drawable.speechbubbler);
-        theBubble.setText(name + " is speaking..");
+        theBubble.setText(name + " is speaking.. Swipe up to applaud his contribution!");
         Animation fade = AnimationUtils.loadAnimation(Participate.this, R.anim.fade);
         theBubble.startAnimation(fade);
         theBubble.setVisibility(View.VISIBLE);
         ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).gravity = Gravity.RIGHT;
         ((LinearLayout.LayoutParams) theBubble.getLayoutParams()).setMargins(
                 0, 0, getResources().getDimensionPixelOffset(R.dimen.handleWidth) / 2, 0);
+        // TODO check
+        theDrawer.setVisibility(View.INVISIBLE);
+        findViewById(R.id.ratingFrame).setVisibility(View.VISIBLE);
+        orangePacman.setVisibility(View.VISIBLE);
 
-        theDrawerHandle.setImageResource(R.drawable.orangepac);
-        // TODO check whether this works
-        theDrawer.lock();
         // set the whole area to grey
         systemVibrator.vibrate(QUICKVIBRATE);
     }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	android:orientation="vertical" android:layout_width="fill_parent"
-	android:layout_height="fill_parent">
+	android:layout_height="fill_parent" android:background="#000">
 
 	<FrameLayout
 	android:id="@+id/theDrawerBackFrame"
@@ -16,14 +16,37 @@
 		android:id="@+id/theDrawerBack"/>
 	</FrameLayout>
 	
-	<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content"
-	android:gravity="bottom" android:layout_gravity="bottom">
-		<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content"
-		android:gravity="bottom" android:layout_gravity="bottom">
-			<!--  Rating -->
-		  	<ImageView android:id="@+id/rateImg" android:layout_width="wrap_content" android:layout_height="wrap_content"
-			  	android:visibility="invisible"></ImageView>
-	  	</LinearLayout>
+	<LinearLayout
+	android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent"
+	>
+	
+		<!-- Top area for rating -->
+		<LinearLayout android:id="@+id/ratingFrame" android:visibility="invisible"
+		android:layout_weight="1" android:layout_height="0dip" android:layout_width="fill_parent">
+			<LinearLayout
+			android:orientation="vertical" android:layout_width="0dip" android:layout_height="fill_parent"
+			android:gravity="bottom" android:layout_gravity="bottom" android:layout_weight="1" android:weightSum="1">
+				<!--  Rating -->
+			  	<ImageView android:id="@+id/rateImg" android:layout_width="wrap_content" android:layout_height="0dip"
+				  	android:layout_gravity="center"></ImageView>
+		  	</LinearLayout>
+		    <RadioGroup
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:orientation="vertical"
+	        android:checkedButton="@+id/ratingGood"
+	        android:id="@+id/ratingRadio"
+	        android:layout_gravity="center"
+	        android:layout_marginRight="10dip">
+	        <RadioButton
+	            android:text="Excellent"
+	            android:id="@+id/ratingExcellent"
+	            />
+	        <RadioButton
+	            android:text="Good"
+	            android:id="@id/ratingGood" />
+	            </RadioGroup>
+		</LinearLayout>
   	
   	<!--  Speech bubble -->
     <TextView
@@ -33,7 +56,7 @@
          android:gravity="center"
          android:textSize="20dp"
          android:textColor="#333"
-         android:background="@drawable/speechbubble" android:visibility="invisible" />
+         android:background="@drawable/speechbubble" android:visibility="invisible"/>
   	
    	<SlidingDrawer
      android:id="@+id/theDrawer"
@@ -54,19 +77,26 @@
          android:layout_height="@dimen/handleHeight"
          />
 
-	<FrameLayout
-    android:id="@id/theDrawerContent"
-	android:layout_height="fill_parent"
-	android:layout_width="fill_parent"
-	android:background="#000">
-     <TextView
-         android:id="@+id/theDrawerText"
-         android:layout_width="wrap_content"
-         android:layout_height="wrap_content" android:layout_gravity="center"
-         android:gravity="center"/>
-	</FrameLayout>
+		<FrameLayout
+	    android:id="@id/theDrawerContent"
+		android:layout_height="fill_parent"
+		android:layout_width="fill_parent"
+		android:background="#000">
+	     <TextView
+	         android:id="@+id/theDrawerText"
+	         android:layout_width="wrap_content"
+	         android:layout_height="wrap_content" android:layout_gravity="center"
+	         android:gravity="center"/>
+		</FrameLayout>
 	 </SlidingDrawer> 
 	</LinearLayout>
+  	<!--  orange pacman -->
+  	<ImageView android:id="@+id/orangePacman"
+  	android:src="@drawable/orangepac"
+    android:layout_gravity="bottom"
+  	android:layout_marginBottom="@dimen/myMarginBottom"
+    android:layout_width="@dimen/handleWidth" android:layout_height="@dimen/handleHeight"
+  	android:visibility="invisible"></ImageView>
   	<!--  green / red pac outlines -->
   	<ImageView android:id="@+id/greenOutline"
   	android:src="@drawable/greenpacout"

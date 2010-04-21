@@ -371,7 +371,7 @@ public class Messager extends Service implements MqttSimpleCallback {
                 // TODO Some unknown failure? What to do here
             }
         } catch (Exception e) {
-            Log.e("register user", e.getMessage());
+            Log.e("register user", "" + e.getMessage());
         }
         subscribeClass();
         Log.d("register", "Done");
