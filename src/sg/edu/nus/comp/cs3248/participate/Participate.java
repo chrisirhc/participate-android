@@ -281,7 +281,7 @@ public class Participate extends Activity {
                 grey(b.getString("name"));
                 rateToast.setText("You are applauding " + psessionBundle.getString("name") + "! :)");
                 unrateToast.setText("No more applaud for " + psessionBundle.getString("name"));
-                rateCurrent(ratedCurrent, false);
+                ((RadioGroup)findViewById(R.id.ratingRadio)).check(R.id.ratingGood);
             } else if (b.getString("action").equals(Messager.ACTION_STOP)) {
                 // someone has stopped speaking
                 if (ratedCurrent) {
