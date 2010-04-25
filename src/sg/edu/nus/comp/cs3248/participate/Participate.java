@@ -135,6 +135,7 @@ public class Participate extends Activity {
                 }
             }
         });
+        rateCurrent(false, false);
         
         // put this in a thread?
         new Thread(new Runnable() {
@@ -493,7 +494,7 @@ public class Participate extends Activity {
         theDrawer.lock();
 
         theBubble.setBackgroundResource(R.drawable.speechbubbler);
-        theBubble.setText(name + " is speaking.. Swipe up to applaud his contribution!");
+        theBubble.setText(name + " is speaking.. Swipe up anywhere to applaud his contribution!");
         Animation fade = AnimationUtils.loadAnimation(Participate.this, R.anim.fade);
         theBubble.startAnimation(fade);
         theBubble.setVisibility(View.VISIBLE);
